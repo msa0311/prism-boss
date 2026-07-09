@@ -1,0 +1,139 @@
+{
+  "uid": "boss-team-work",
+  "title": "Team Work",
+  "description": "Work performed by the team, assessed by the boss agent from Slack activity.",
+  "schemaVersion": 39,
+  "editable": true,
+  "graphTooltip": 1,
+  "time": { "from": "now-30d", "to": "now" },
+  "refresh": "1m",
+  "templating": {
+    "list": [
+      {
+        "name": "kind",
+        "label": "Performer kind",
+        "type": "custom",
+        "query": "agent,human",
+        "multi": true,
+        "includeAll": true,
+        "allValue": "agent,human",
+        "current": { "text": "agent", "value": "agent" },
+        "options": [
+          { "text": "All", "value": "$__all", "selected": false },
+          { "text": "agent", "value": "agent", "selected": true },
+          { "text": "human", "value": "human", "selected": false }
+        ]
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "stat", "title": "Work items", "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "frser-sqlite-datasource", "uid": "boss-sqlite" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "text" }, "unit": "none" }, "overrides": [] },
+      "options": { "colorMode": "none", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "queryType": "table", "rawQueryText": "SELECT count(*) AS items FROM assessments WHERE performer_kind IN (${kind:sqlstring}) AND CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds}", "queryText": "SELECT count(*) AS items FROM assessments WHERE performer_kind IN (${kind:sqlstring}) AND CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds}" }]
+    },
+    {
+      "type": "stat", "title": "Team SLA", "description": "resolved+delivered+mitigated+no_action / (that + failed). Attention items excluded.", "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "frser-sqlite-datasource", "uid": "boss-sqlite" },
+      "fieldConfig": { "defaults": { "unit": "percent", "decimals": 1, "min": 0, "max": 100, "thresholds": { "mode": "absolute", "steps": [ { "color": "#d03b3b", "value": null }, { "color": "#c98500", "value": 90 }, { "color": "#199e70", "value": 95 } ] }, "color": { "mode": "thresholds" } }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "queryType": "table", "rawQueryText": "SELECT 100.0 * sum(status='ok') / nullif(sum(status IN ('ok','failed')), 0) AS sla FROM assessments WHERE performer_kind IN (${kind:sqlstring}) AND CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds}", "queryText": "SELECT 100.0 * sum(status='ok') / nullif(sum(status IN ('ok','failed')), 0) AS sla FROM assessments WHERE performer_kind IN (${kind:sqlstring}) AND CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds}" }]
+    },
+    {
+      "type": "stat", "title": "Est. human-hours saved", "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "frser-sqlite-datasource", "uid": "boss-sqlite" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "#199e70" }, "unit": "none", "decimals": 1 }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "queryType": "table", "rawQueryText": "SELECT coalesce(sum(human_minutes_saved),0)/60.0 AS hours FROM assessments WHERE performer_kind='agent' AND CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds}", "queryText": "SELECT coalesce(sum(human_minutes_saved),0)/60.0 AS hours FROM assessments WHERE performer_kind='agent' AND CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds}" }]
+    },
+    {
+      "type": "stat", "title": "Needed a human", "description": "needs_human + escalated + rejected", "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "frser-sqlite-datasource", "uid": "boss-sqlite" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "#c98500" }, "unit": "none" }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "queryType": "table", "rawQueryText": "SELECT sum(status='attention') AS n FROM assessments WHERE performer_kind IN (${kind:sqlstring}) AND CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds}", "queryText": "SELECT sum(status='attention') AS n FROM assessments WHERE performer_kind IN (${kind:sqlstring}) AND CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds}" }]
+    },
+    {
+      "type": "timeseries", "title": "Work items over time, by outcome", "gridPos": { "h": 9, "w": 16, "x": 0, "y": 4 },
+      "datasource": { "type": "frser-sqlite-datasource", "uid": "boss-sqlite" },
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 85, "lineWidth": 0, "stacking": { "mode": "normal" } }, "unit": "none", "min": 0 },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "resolved" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#199e70" } }] },
+          { "matcher": { "id": "byName", "options": "delivered" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#3987e5" } }] },
+          { "matcher": { "id": "byName", "options": "mitigated" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#9085e9" } }] },
+          { "matcher": { "id": "byName", "options": "no_action_needed" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#008300" } }] },
+          { "matcher": { "id": "byName", "options": "needs_human" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#c98500" } }] },
+          { "matcher": { "id": "byName", "options": "escalated" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#d95926" } }] },
+          { "matcher": { "id": "byName", "options": "rejected" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#d55181" } }] },
+          { "matcher": { "id": "byName", "options": "failed" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#d03b3b" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi" } },
+      "targets": [{ "refId": "A", "queryType": "time series", "timeColumns": ["time"], "rawQueryText": "SELECT cast(strftime('%s', date(ts)) AS int) * 1000 AS time, outcome, count(*) AS items FROM assessments WHERE performer_kind IN (${kind:sqlstring}) AND CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} GROUP BY date(ts), outcome ORDER BY time", "queryText": "SELECT cast(strftime('%s', date(ts)) AS int) * 1000 AS time, outcome, count(*) AS items FROM assessments WHERE performer_kind IN (${kind:sqlstring}) AND CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} GROUP BY date(ts), outcome ORDER BY time" }]
+    },
+    {
+      "type": "piechart", "title": "Outcome mix", "gridPos": { "h": 9, "w": 8, "x": 16, "y": 4 },
+      "datasource": { "type": "frser-sqlite-datasource", "uid": "boss-sqlite" },
+      "fieldConfig": {
+        "defaults": { "unit": "none" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "resolved" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#199e70" } }] },
+          { "matcher": { "id": "byName", "options": "delivered" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#3987e5" } }] },
+          { "matcher": { "id": "byName", "options": "mitigated" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#9085e9" } }] },
+          { "matcher": { "id": "byName", "options": "no_action_needed" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#008300" } }] },
+          { "matcher": { "id": "byName", "options": "needs_human" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#c98500" } }] },
+          { "matcher": { "id": "byName", "options": "escalated" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#d95926" } }] },
+          { "matcher": { "id": "byName", "options": "rejected" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#d55181" } }] },
+          { "matcher": { "id": "byName", "options": "failed" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#d03b3b" } }] }
+        ]
+      },
+      "options": { "pieType": "donut", "legend": { "displayMode": "list", "placement": "right", "showLegend": true }, "reduceOptions": { "calcs": ["lastNotNull"], "values": true } },
+      "targets": [{ "refId": "A", "queryType": "table", "rawQueryText": "SELECT outcome, count(*) AS items FROM assessments WHERE performer_kind IN (${kind:sqlstring}) AND CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} GROUP BY outcome ORDER BY items DESC", "queryText": "SELECT outcome, count(*) AS items FROM assessments WHERE performer_kind IN (${kind:sqlstring}) AND CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} GROUP BY outcome ORDER BY items DESC" }]
+    },
+    {
+      "type": "table", "title": "Team roster", "gridPos": { "h": 8, "w": 24, "x": 0, "y": 13 },
+      "datasource": { "type": "frser-sqlite-datasource", "uid": "boss-sqlite" },
+      "fieldConfig": { "defaults": { "custom": { "align": "left" } }, "overrides": [ { "matcher": { "id": "byName", "options": "SLA %" }, "properties": [{ "id": "unit", "value": "percent" }, { "id": "decimals", "value": 0 }] }, { "matcher": { "id": "byName", "options": "minutes saved" }, "properties": [{ "id": "decimals", "value": 0 }] } ] },
+      "options": { "showHeader": true, "sortBy": [{ "displayName": "items", "desc": true }] },
+      "targets": [{ "refId": "A", "queryType": "table", "rawQueryText": "SELECT performer_name AS performer, performer_kind AS kind, count(*) AS items, sum(status='attention') AS attention, sum(status='failed') AS failed, round(100.0*sum(status='ok')/nullif(sum(status IN ('ok','failed')),0),0) AS 'SLA %', coalesce(sum(human_minutes_saved),0) AS 'minutes saved', max(ts) AS 'last seen' FROM assessments WHERE performer_kind IN (${kind:sqlstring}) AND CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} GROUP BY performer_id ORDER BY items DESC", "queryText": "SELECT performer_name AS performer, performer_kind AS kind, count(*) AS items, sum(status='attention') AS attention, sum(status='failed') AS failed, round(100.0*sum(status='ok')/nullif(sum(status IN ('ok','failed')),0),0) AS 'SLA %', coalesce(sum(human_minutes_saved),0) AS 'minutes saved', max(ts) AS 'last seen' FROM assessments WHERE performer_kind IN (${kind:sqlstring}) AND CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} GROUP BY performer_id ORDER BY items DESC" }]
+    },
+    {
+      "type": "barchart", "title": "By category", "gridPos": { "h": 9, "w": 6, "x": 0, "y": 21 },
+      "datasource": { "type": "frser-sqlite-datasource", "uid": "boss-sqlite" },
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 85, "lineWidth": 0 }, "unit": "none", "min": 0, "color": { "mode": "fixed", "fixedColor": "#199e70" } }, "overrides": [] },
+      "options": { "orientation": "horizontal", "legend": { "showLegend": false }, "tooltip": { "mode": "single" } },
+      "targets": [{ "refId": "A", "queryType": "table", "rawQueryText": "SELECT coalesce(category,'(none)') AS category, count(*) AS items FROM assessments WHERE performer_kind IN (${kind:sqlstring}) AND CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} GROUP BY category ORDER BY items DESC LIMIT 12", "queryText": "SELECT coalesce(category,'(none)') AS category, count(*) AS items FROM assessments WHERE performer_kind IN (${kind:sqlstring}) AND CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} GROUP BY category ORDER BY items DESC LIMIT 12" }]
+    },
+    {
+      "type": "barchart", "title": "By type", "gridPos": { "h": 9, "w": 6, "x": 6, "y": 21 },
+      "datasource": { "type": "frser-sqlite-datasource", "uid": "boss-sqlite" },
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 85, "lineWidth": 0 }, "unit": "none", "min": 0, "color": { "mode": "fixed", "fixedColor": "#3987e5" } }, "overrides": [] },
+      "options": { "orientation": "horizontal", "legend": { "showLegend": false }, "tooltip": { "mode": "single" } },
+      "targets": [{ "refId": "A", "queryType": "table", "rawQueryText": "SELECT type, count(*) AS items FROM assessments WHERE performer_kind IN (${kind:sqlstring}) AND CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} GROUP BY type ORDER BY items DESC", "queryText": "SELECT type, count(*) AS items FROM assessments WHERE performer_kind IN (${kind:sqlstring}) AND CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} GROUP BY type ORDER BY items DESC" }]
+    },
+    {
+      "type": "table", "title": "Humans vs agents (always both)", "description": "Like-for-like: same rubric, same channel evidence. avg time-to-outcome and outcome mix per performer kind.", "gridPos": { "h": 9, "w": 12, "x": 12, "y": 21 },
+      "datasource": { "type": "frser-sqlite-datasource", "uid": "boss-sqlite" },
+      "fieldConfig": { "defaults": { "custom": { "align": "left" } }, "overrides": [ { "matcher": { "id": "byName", "options": "avg min" }, "properties": [{ "id": "decimals", "value": 0 }] } ] },
+      "options": { "showHeader": true },
+      "targets": [{ "refId": "A", "queryType": "table", "rawQueryText": "SELECT performer_kind AS kind, count(*) AS items, sum(status='ok') AS ok, sum(status='attention') AS attention, sum(status='failed') AS failed, round(avg(duration_ms)/60000.0,0) AS 'avg min' FROM assessments WHERE CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} GROUP BY performer_kind ORDER BY items DESC", "queryText": "SELECT performer_kind AS kind, count(*) AS items, sum(status='ok') AS ok, sum(status='attention') AS attention, sum(status='failed') AS failed, round(avg(duration_ms)/60000.0,0) AS 'avg min' FROM assessments WHERE CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} GROUP BY performer_kind ORDER BY items DESC" }]
+    },
+    {
+      "type": "table", "title": "Work chains (multi-stage)", "description": "One work item (same id) that moved through more than one stage.", "gridPos": { "h": 8, "w": 12, "x": 0, "y": 30 },
+      "datasource": { "type": "frser-sqlite-datasource", "uid": "boss-sqlite" },
+      "fieldConfig": { "defaults": { "custom": { "align": "left" } }, "overrides": [] },
+      "options": { "showHeader": true },
+      "targets": [{ "refId": "A", "queryType": "table", "rawQueryText": "SELECT id AS 'work id', group_concat(type || ':' || outcome, ' -> ') AS stages, count(*) AS records, max(ts) AS 'last seen' FROM (SELECT * FROM assessments WHERE performer_kind IN (${kind:sqlstring}) AND CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} ORDER BY ts) GROUP BY id HAVING count(DISTINCT type) > 1 ORDER BY max(ts) DESC", "queryText": "SELECT id AS 'work id', group_concat(type || ':' || outcome, ' -> ') AS stages, count(*) AS records, max(ts) AS 'last seen' FROM (SELECT * FROM assessments WHERE performer_kind IN (${kind:sqlstring}) AND CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} ORDER BY ts) GROUP BY id HAVING count(DISTINCT type) > 1 ORDER BY max(ts) DESC" }]
+    },
+    {
+      "type": "table", "title": "Recent — needs attention", "gridPos": { "h": 8, "w": 12, "x": 12, "y": 30 },
+      "datasource": { "type": "frser-sqlite-datasource", "uid": "boss-sqlite" },
+      "fieldConfig": { "defaults": { "custom": { "align": "left" } }, "overrides": [] },
+      "options": { "showHeader": true },
+      "targets": [{ "refId": "A", "queryType": "table", "rawQueryText": "SELECT ts, performer_name AS performer, type, outcome, coalesce(severity,'') AS severity, coalesce(category,'') AS category, coalesce(summary,'') AS summary FROM assessments WHERE status IN ('attention','failed') AND performer_kind IN (${kind:sqlstring}) AND CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} ORDER BY ts DESC LIMIT 25", "queryText": "SELECT ts, performer_name AS performer, type, outcome, coalesce(severity,'') AS severity, coalesce(category,'') AS category, coalesce(summary,'') AS summary FROM assessments WHERE status IN ('attention','failed') AND performer_kind IN (${kind:sqlstring}) AND CAST(strftime('%s', ts) AS INTEGER) BETWEEN ${__from:date:seconds} AND ${__to:date:seconds} ORDER BY ts DESC LIMIT 25" }]
+    }
+  ]
+}
