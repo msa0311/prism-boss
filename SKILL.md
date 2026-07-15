@@ -1,5 +1,6 @@
 ---
-name: boss
+name: prism-boss
+license: Apache-2.0
 description: >-
   Be the team lead: passively observe the team's Slack channels, assess every
   completed unit of work your teammates (agents AND humans) deliver, record it
@@ -38,10 +39,10 @@ Read both before assessing.
 You run the setup; the user only does the few things you cannot.
 
 1. **Install the dashboard stack** (once): run
-   `bash /data/skills/boss/scripts/setup-grafana.sh` via `shell_exec`. It
+   `bash /data/skills/prism-boss/scripts/setup-grafana.sh` via `shell_exec`. It
    downloads Grafana into `/data/grafana`, installs the SQLite datasource,
    provisions it against `/data/boss/assessments.db`, and installs the default
-   `Team Work` dashboard. Then `bash /data/skills/boss/scripts/ensure-grafana.sh`
+   `Team Work` dashboard. Then `bash /data/skills/prism-boss/scripts/ensure-grafana.sh`
    to start it. Re-run `ensure-grafana.sh` at the **start of every run** — the
    sandbox has no init system, so Grafana is down after a restart until you
    start it (say so honestly if asked; it's not always-on).
@@ -65,7 +66,7 @@ You run the setup; the user only does the few things you cannot.
    or a `human`. Curate a short per-team `category` vocabulary here too (e.g.
    `k8s-triage`, `gitops-pr`, `customer-ticket`).
 6. **Smoke-test**: record a `boss.setup` item —
-   `node /data/skills/boss/scripts/record-assessment.mjs '{"type":"boss.setup","outcome":"no_action_needed","id":"setup","performer_id":"boss","performer_name":"Boss","performer_kind":"agent"}'`
+   `node /data/skills/prism-boss/scripts/record-assessment.mjs '{"type":"boss.setup","outcome":"no_action_needed","id":"setup","performer_id":"boss","performer_name":"Boss","performer_kind":"agent"}'`
    — and confirm it appears on the dashboard.
 
 ## Part B — Assessing (when a Slack-triggered heartbeat fires)
@@ -93,7 +94,7 @@ respond only with a brief internal note):
    recorder also guards this). Only record *completed* work; wait for a later
    batch if a thread is still in progress.
 5. **Record** each unit with one `shell_exec` call:
-   `node /data/skills/boss/scripts/record-assessment.mjs '<JSON>'`
+   `node /data/skills/prism-boss/scripts/record-assessment.mjs '<JSON>'`
    (fields per `references/assessment.md`; set `performer_*` from your roster
    mapping, `channel` from the batch). On exit 1, fix the JSON per the error and
    retry once.
@@ -106,7 +107,7 @@ reflects new work immediately.
 Query the ledger/db with `shell_exec` (jq over `/data/boss/assessments.jsonl`,
 or the sqlite db), summarize in a compact table, and point to the dashboard URL.
 Rebuild the db from the ledger any time with
-`node /data/skills/boss/scripts/record-assessment.mjs --rebuild` (the ledger is
+`node /data/skills/prism-boss/scripts/record-assessment.mjs --rebuild` (the ledger is
 always the source of truth).
 
 ## Editing the dashboard
